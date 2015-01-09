@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+
+{% block javascript %}
+	<script>
+	var minDate = new Date('2010-04-01');
+    var maxDate = new Date();
+
+    {% if since %}
+    var defaultDate = new Date('{{ since }}');
+    {% else %}
+    var defaultDate = new Date();
+    defaultDate.setMonth(defaultDate.getMonth() - 1);
+    defaultDate.setDate(1);
+    {% endif %}
+
+    new Pikaday({
+        field: document.getElementById('datepicker'),
+        firstDay: 1,
+        format: 'YYYY-MM-DD',
+        minDate: minDate,
+        defaultDate: defaultDate,
+        setDefaultDate: true,
+        maxDate: maxDate,
+        yearRange: [minDate.getFullYear(), maxDate.getFullYear()]
+    });
+    </script>
+{% endblock %}
+
+
+{% block content %}
+	{% if not since %}<div class="screencenter">{% endif %}
+	<form action="." method="GET">
+	<h3 class="title">{% if since %}<a href="/">{% endif %}Обзор свежих материалов по проектированию интерфейсов{% if since %}</a>{% endif %}</h3>
+	<div class="datepicker"><label>Since: <input type="text" name="since" id="datepicker"></label><input type="submit" value="Load"></div>
+	{% if not since %}<div class="subtitle"><a href="https://www.facebook.com/groups/pdigest/">facebook.com/groups/pdigest</a></div>{% endif %}
+	</form>
+	{% if not since %}</div>{% endif %}
+	{% if since %}
+		{% if pdigest %}
+			<div class="feed">
+			{% for post in pdigest %}
+			<div class="feed__element">
+				{% if post.link %}
+				<div class="feed__element__title">&lt;strong&gt;&lt;a href="{{ post.link }}"&gt;{% if post.name %}{{ post.name }}{% else %}{{ post.link }}{% endif %}&lt;/a&gt;&lt;/strong&gt;</div>
+				{% elif post.name %}
+				<div class="feed__element__title">&lt;strong&gt;{{ post.name }}&lt;/strong&gt;</div>
+				{% endif %}
+				{% if post.message %}
+				<div class="feed__element__message{% if post.name or post.link %} feed__element__message_br{% endif %}">{{ post.message|safe }}</div>
+				{% endif %}
+			</div>
+			{% if post.comments %}
+			<div class="feed__comments">&lt;ul&gt;
+				{% for comment in post.comments %}
+				<div class="feed__comment">&lt;li&gt;{{ comment }}&lt;/li&gt;</div>
+				{% endfor %}
+			&lt;/ul&gt;</div>
+			{% endif %}
+			{% if post.embeds %}
+			<div class="feed__embeds">
+				{% for embed in post.embeds %}
+				<div class="feed__embed">{{ embed }}</div>
+				{% endfor %}
+			</div>
+			{% endif %}
+			<div class="feeddiv"><br><br></div>
+			{% endfor %}
+			</div>
+		{% else %}
+			<div class="error"><strong>Error</strong>No data loaded</div>
+		{% endif %}
+	{% endif %}
+{% endblock %}

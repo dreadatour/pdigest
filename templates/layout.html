@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>{% block title %}Дайджест продуктового дизайна{% endblock %}</title>
+	<link rel="shortcut icon" href="/static/favicon.ico">
+	<link rel="stylesheet" href="/static/css/pdigest.css">
+	{% block stylesheets %}{% endblock %}
+</head>
+<body>
+	{% block content %}{% endblock %}
+	<script src="/static/js/pdigest.js"></script>
+	{% block javascript %}{% endblock %}
+</body>
+</html>
