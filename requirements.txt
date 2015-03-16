@@ -1,3 +1,2 @@
-facepy==1.0.6
 Flask==0.10.1
 requests==2.5.1

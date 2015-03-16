@@ -1,3 +1,4 @@
 DEBUG = False
 FACEBOOK_APP_ID = '{your facebook app id}'
 FACEBOOK_APP_SECRET = '{your facebook app secret}'
+FEED_ID = '{your facebook feed id}'

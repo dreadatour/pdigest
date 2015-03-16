@@ -4,7 +4,6 @@ import re
 import time
 
 import requests
-from facepy import GraphAPI, utils
 from flask import Flask, render_template, request
 
 
@@ -90,36 +89,163 @@ def get_embed(text):
     return result
 
 
+def str2date(text):
+    """
+    Convert facebook date from string to date object.
+    """
+    text_date = re.sub(r'T.*', '', text)
+    return datetime.datetime.strptime(text_date, '%Y-%m-%d').date()
+
+
+class FacebookError(Exception):
+    pass
+
+
+class Facebook(object):
+    """
+    Work with Facebook API.
+    """
+    app_id = None
+    app_secret = None
+    group_id = None
+    access_token = None
+    data = None
+
+    def __init__(self, app_id, app_secret, group_id):
+        self.app_id = app_id
+        self.app_secret = app_secret
+        self.group_id = group_id
+        self.access_token = None
+
+    def get_access_token(self):
+        """
+        Get Facebook access token.
+        """
+        access_token_url = 'https://graph.facebook.com/oauth/access_token'
+        params = {
+            'client_id': self.app_id,
+            'client_secret': self.app_secret,
+            'grant_type': 'client_credentials',
+        }
+        response = requests.get(access_token_url, params=params)
+
+        if response.status_code != 200:
+            raise FacebookError('Wrong auth response status code: {0}'.format(
+                response.status_code
+            ))
+
+        if not response.text.startswith('access_token='):
+            raise FacebookError('Wrong auth respoce: {0}'.format(
+                response.text
+            ))
+
+        self.access_token = response.text
+
+    def get_posts(self, since):
+        """
+        Get group posts.
+        """
+        since_timestamp = int(time.mktime(since.timetuple()))
+
+        if self.access_token is None:
+            self.get_access_token()
+
+        feed_url = (
+            'https://graph.facebook.com/v2.2/{0}?fields=feed.since({1})'
+            '.limit(9999).fields(id,attachments,full_picture,from'
+            ',message,picture,link,name,caption,description,created_time'
+            ',updated_time,comments.limit(9999)'
+            '.fields(created_time,message))&{2}'
+        ).format(self.group_id, since_timestamp, self.access_token)
+
+        result = []
+
+        counter = 0
+        while True:
+            counter += 1
+            if counter > 100:
+                raise FacebookError('Too many requests')
+
+            response = requests.get(feed_url)
+
+            if response.status_code != 200:
+                raise FacebookError(
+                    'Wrong feed response status code: {0}'.format(
+                        response.status_code
+                    )
+                )
+
+            try:
+                data_json = response.json()
+            except Exception:
+                raise FacebookError('Wrong feed response: {0}'.format(
+                    response.text
+                ))
+            else:
+                if 'feed' in data_json:
+                    data = data_json['feed']
+                else:
+                    data = data_json
+
+            if 'data' not in data or not data['data']:
+                raise FacebookError('Empty feed response: {0}'.format(
+                    response.text
+                ))
+
+            is_enough = False
+
+            if 'paging' in data and 'next' in data['paging']:
+                feed_url = data['paging']['next']
+            else:
+                is_enough = True
+
+            for post in data['data']:
+                if 'updated_time' not in post or not post['updated_time']:
+                    continue
+
+                if str2date(post['updated_time']) < since:
+                    is_enough = True
+                    break
+
+                result.append(post)
+
+            if is_enough:
+                break
+
+        return result
+
+
 def get_digest(since):
     """
     Get digest page.
     """
-    since_timestamp = int(time.mktime(since.timetuple()))
-    facebook_request = (
-        '/173955382668026?fields=feed.since({0}).limit(9999).fields('
-        'id,attachments,full_picture,from,message,picture,link,name,caption,'
-        'description,comments.limit(9999).fields(created_time,message))'
-    ).format(since_timestamp)
+    # since_timestamp = int(time.mktime(since.timetuple()))
 
-    app_id = int(app.config['FACEBOOK_APP_ID'])
-    app_secret = app.config['FACEBOOK_APP_SECRET']
-    access_token = utils.get_application_access_token(app_id, app_secret)
+    facebook_api = Facebook(
+        app_id=app.config['FACEBOOK_APP_ID'],
+        app_secret=app.config['FACEBOOK_APP_SECRET'],
+        group_id=app.config['FEED_ID']
+    )
 
-    graph = GraphAPI(access_token)
-    posts = graph.get(facebook_request)
-
-    if not posts or'feed' not in posts or 'data' not in posts['feed']:
+    try:
+        posts = facebook_api.get_posts(since=since)
+    except FacebookError:
         return
 
     result = []
-    for post in posts['feed']['data']:
+    for post in posts:
         name = post.get('name')
+        link = post.get('link')
+        message = post.get('message')
+
         if name:
             name = re.sub(r'\n+', ' ', name)
 
-        link = post.get('link')
+        if not link and message:
+            match = url_re.findall(message)
+            if len(match) > 0:
+                link = match[0]
 
-        message = post.get('message')
         if message:
             message = re.sub(r'</?p>', '', message)
             message = re.sub(r'\n+', '<br><br>', message)
@@ -170,6 +296,7 @@ def get_digest(since):
             'message': message,
             'comments': comments,
             'embeds': list(set(embeds)),
+            'is_old': bool(str2date(post['created_time']) < since),
         }
 
         result.append(data)

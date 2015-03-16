@@ -40,7 +40,7 @@
 		{% if pdigest %}
 			<div class="feed">
 			{% for post in pdigest %}
-			<div class="feed__element">
+			<div class="feed__element{% if post.is_old %} feed__element_old{% endif %}">
 				{% if post.link %}
 				<div class="feed__element__title">&lt;strong&gt;&lt;a href="{{ post.link }}"&gt;{% if post.name %}{{ post.name }}{% else %}{{ post.link }}{% endif %}&lt;/a&gt;&lt;/strong&gt;</div>
 				{% elif post.name %}
