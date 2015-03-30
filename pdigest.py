@@ -141,22 +141,29 @@ class Facebook(object):
 
         self.access_token = response.text
 
-    def get_posts(self, since):
+    def get_posts(self, since, until):
         """
         Get group posts.
         """
+        # import ipdb; ipdb.set_trace()  # Achtung!
         since_timestamp = int(time.mktime(since.timetuple()))
+        until_timestamp = int(time.mktime(until.timetuple()))
 
         if self.access_token is None:
             self.get_access_token()
 
         feed_url = (
-            'https://graph.facebook.com/v2.2/{0}?fields=feed.since({1})'
-            '.limit(9999).fields(id,attachments,full_picture,from'
-            ',message,picture,link,name,caption,description,created_time'
-            ',updated_time,comments.limit(9999)'
-            '.fields(created_time,message))&{2}'
-        ).format(self.group_id, since_timestamp, self.access_token)
+            'https://graph.facebook.com/v2.2/{0}?fields=feed'
+            '.since({1}).until({2}).limit(9999).fields('
+            'id,attachments,full_picture,from,message,picture,link,name,'
+            'caption,description,created_time,updated_time,'
+            'comments.limit(9999).fields(created_time,message))&{3}'
+        ).format(
+            self.group_id,
+            since_timestamp,
+            until_timestamp,
+            self.access_token
+        )
 
         result = []
 
@@ -188,6 +195,8 @@ class Facebook(object):
                     data = data_json
 
             if 'data' not in data or not data['data']:
+                if result:
+                    break
                 raise FacebookError('Empty feed response: {0}'.format(
                     response.text
                 ))
@@ -203,6 +212,9 @@ class Facebook(object):
                 if 'updated_time' not in post or not post['updated_time']:
                     continue
 
+                if str2date(post['updated_time']) > until:
+                    continue
+
                 if str2date(post['updated_time']) < since:
                     is_enough = True
                     break
@@ -215,12 +227,10 @@ class Facebook(object):
         return result
 
 
-def get_digest(since):
+def get_digest(since, until):
     """
     Get digest page.
     """
-    # since_timestamp = int(time.mktime(since.timetuple()))
-
     facebook_api = Facebook(
         app_id=app.config['FACEBOOK_APP_ID'],
         app_secret=app.config['FACEBOOK_APP_SECRET'],
@@ -228,7 +238,7 @@ def get_digest(since):
     )
 
     try:
-        posts = facebook_api.get_posts(since=since)
+        posts = facebook_api.get_posts(since=since, until=until)
     except FacebookError:
         return
 
@@ -278,6 +288,8 @@ def get_digest(since):
             comment_time = datetime.datetime.strptime(comment_time, '%Y-%m-%d')
             if comment_time.date() < since:
                 continue
+            # if comment_time.date() > until:
+            #     continue
 
             comment_text = comment.get('message', '')
 
@@ -326,17 +338,29 @@ def index():
     Get index page.
     """
     since = request.args.get('since', None)
+    until = request.args.get('until', None)
     pdigest = None
 
     if since:
+        if until:
+            try:
+                until = datetime.datetime.strptime(until, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                until = None
+
         try:
             since = datetime.datetime.strptime(since, '%Y-%m-%d').date()
         except (ValueError, TypeError):
             since = None
         else:
-            pdigest = get_digest(since)
+            pdigest = get_digest(since, until)
 
-    return render_template('index.html', since=since, pdigest=pdigest)
+    return render_template(
+        'index.html',
+        since=since,
+        until=until,
+        pdigest=pdigest
+    )
 
 
 if __name__ == '__main__':

@@ -7,11 +7,17 @@
     var maxDate = new Date();
 
     {% if since %}
-    var defaultDate = new Date('{{ since }}');
+    var defaultDate1 = new Date('{{ since }}');
     {% else %}
-    var defaultDate = new Date();
-    defaultDate.setMonth(defaultDate.getMonth() - 1);
-    defaultDate.setDate(1);
+    var defaultDate1 = new Date();
+    defaultDate1.setMonth(defaultDate1.getMonth() - 1);
+    defaultDate1.setDate(1);
+    {% endif %}
+
+    {% if until %}
+    var defaultDate2 = new Date('{{ until }}');
+    {% else %}
+    var defaultDate2 = new Date();
     {% endif %}
 
     new Pikaday({
@@ -19,7 +25,17 @@
         firstDay: 1,
         format: 'YYYY-MM-DD',
         minDate: minDate,
-        defaultDate: defaultDate,
+        defaultDate: defaultDate1,
+        setDefaultDate: true,
+        maxDate: maxDate,
+        yearRange: [minDate.getFullYear(), maxDate.getFullYear()]
+    });
+    new Pikaday({
+        field: document.getElementById('datepicker2'),
+        firstDay: 1,
+        format: 'YYYY-MM-DD',
+        minDate: minDate,
+        defaultDate: defaultDate2,
         setDefaultDate: true,
         maxDate: maxDate,
         yearRange: [minDate.getFullYear(), maxDate.getFullYear()]
@@ -32,7 +48,7 @@
 	{% if not since %}<div class="screencenter">{% endif %}
 	<form action="." method="GET">
 	<h3 class="title">{% if since %}<a href="/">{% endif %}Обзор свежих материалов по проектированию интерфейсов{% if since %}</a>{% endif %}</h3>
-	<div class="datepicker"><label>Since: <input type="text" name="since" id="datepicker"></label><input type="submit" value="Load"></div>
+	<div class="datepicker"><label>Since: <input type="text" name="since" id="datepicker"></label>&nbsp;&nbsp;<label>Until: <input type="text" name="until" id="datepicker2"></label><input type="submit" value="Load"></div>
 	{% if not since %}<div class="subtitle"><a href="https://www.facebook.com/groups/pdigest/">facebook.com/groups/pdigest</a></div>{% endif %}
 	</form>
 	{% if not since %}</div>{% endif %}
